@@ -14,6 +14,7 @@ export class RegisterService {
     return this.registersRepository
       .createQueryBuilder('register')
       .innerJoinAndSelect('register.player', 'player')
+      .innerJoinAndSelect('register.penalty', 'penalty') // Add this line
       .where('player.team.id = :teamId', { teamId })
       .getMany();
   }

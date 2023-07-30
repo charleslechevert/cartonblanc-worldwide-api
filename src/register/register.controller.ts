@@ -15,6 +15,7 @@ import * as bcrypt from 'bcrypt';
 import { userInfo } from 'os';
 import { Response, Request } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
+import { Public } from 'src/decorators/public.decorator';
 
 @Controller('register')
 export class RegisterController {
@@ -29,6 +30,17 @@ export class RegisterController {
     // Get the registers for the given team_id
     const registers = await this.registerService.findAllRegistersByTeam(
       team_id,
+    ); // and here
+
+    return registers;
+  }
+
+  @Public()
+  @Get('demo')
+  async getRegistersDemo() {
+    // Get the registers for the given team_id
+    const registers = await this.registerService.findAllRegistersByTeam(
+      12071998,
     ); // and here
 
     return registers;
