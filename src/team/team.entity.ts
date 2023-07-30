@@ -1,11 +1,12 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { IsEmail, IsHexColor } from 'class-validator';
 
 @Entity('team')
 export class Team {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ unique: true })
   full_name: string;
 
   @Column()
@@ -26,12 +27,22 @@ export class Team {
   @Column({ nullable: true })
   sentence: string;
 
+  @IsEmail()
   @Column()
   email_team: string;
 
+  @IsEmail()
+  @Column()
+  email_admin: string;
+
+  @IsHexColor()
   @Column()
   color1: string;
 
+  @IsHexColor()
   @Column()
   color2: string;
+
+  @Column({ nullable: true })
+  refresh_token: string;
 }

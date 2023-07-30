@@ -8,78 +8,60 @@ import {
   BadRequestException,
   Req,
   Res,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { TeamService } from './team.service';
 import { Team } from './team.entity'; // path may vary
 import * as bcrypt from 'bcrypt';
 import { userInfo } from 'os';
-import { JwtService } from '@nestjs/jwt';
 import { Response, Request } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
+import { Tokens } from 'src/types';
+import { AuthDto } from '../dto';
+import { Http2ServerRequest } from 'http2';
+
+import { AuthGuard } from '@nestjs/passport';
+import { AtGuard, RtGuard } from 'src/guards';
+import { GetCurrentUser } from 'src/decorators/get-current-user.decorator';
+import { GetCurrentUserId } from 'src/decorators/get-current-user-id.decorator';
+import { Public } from 'src/decorators/public.decorator';
 
 @Controller('team')
 export class TeamController {
-  constructor(
-    private readonly teamService: TeamService,
-    private jwtService: JwtService,
-  ) {}
+  constructor(private readonly teamService: TeamService) {}
 
-  @Get()
-  findAll(): Promise<Team[]> {
-    return this.teamService.findAll();
+  @Public()
+  @Post('signup')
+  @HttpCode(HttpStatus.CREATED)
+  signup(@Body() teamData: Partial<Team>): Promise<Tokens> {
+    return this.teamService.signup(teamData);
   }
 
-  @Post('register')
-  register(@Body() teamData: Partial<Team>): Promise<Team> {
-    return this.teamService.createTeam(teamData);
+  @Public()
+  @Post('signin')
+  @HttpCode(HttpStatus.OK)
+  signinLocal(@Body() dto: AuthDto): Promise<Tokens> {
+    return this.teamService.signin(dto);
   }
 
-  @Post('login')
-  async login(
-    @Body('full_name') full_name: string,
-    @Body('password') password: string,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const team = await this.teamService.findOne(full_name);
-    if (!team) {
-      throw new BadRequestException('Invalid credentials');
-    }
-    const isMatch = await bcrypt.compare(password, team.password);
-    if (!isMatch) {
-      throw new BadRequestException('Invalid credentials');
-    }
-
-    const jwt = await this.jwtService.signAsync({ id: team.id });
-
-    response.cookie('jwt', jwt, { httpOnly: true });
-
-    return team;
-    // You should return something here, like a JWT or user information
+  //@UseGuards(AuthGuard('jwt'))
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  logout(@GetCurrentUserId() teamId: number) {
+    return this.teamService.logout(teamId);
   }
 
-  @Get('user')
-  async user(@Req() request: Request) {
-    console.log('yoooo');
-    try {
-      const cookie = request.cookies['jwt'];
-
-      const data = await this.jwtService.verifyAsync(cookie);
-
-      console.log(data);
-
-      if (!data) {
-        throw new UnauthorizedException();
-      }
-
-      const team = await this.teamService.findOneById(data['id']);
-
-      console.log(team);
-
-      const { password, admin_password, ...result } = team;
-
-      return result;
-    } catch (e) {
-      throw new UnauthorizedException();
-    }
+  @Public()
+  @UseGuards(RtGuard)
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  refreshTokens(
+    @GetCurrentUserId() teamId: number,
+    @GetCurrentUser('refreshToken') refreshToken: string,
+  ): Promise<Tokens> {
+    console.log(teamId);
+    return this.teamService.refreshTokens(teamId, refreshToken);
   }
 }
