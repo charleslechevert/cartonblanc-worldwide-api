@@ -8,6 +8,8 @@ import {
   BadRequestException,
   Req,
   Res,
+  Param,
+  UseGuards,
 } from '@nestjs/common';
 import { PlayerService } from './player.service';
 import { Player } from './player.entity';
@@ -15,6 +17,8 @@ import * as bcrypt from 'bcrypt';
 import { userInfo } from 'os';
 import { Response, Request } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
+import { TeamGuard } from 'src/guards';
+import { Public } from 'src/decorators';
 
 @Controller('player')
 export class PlayerController {
@@ -22,13 +26,10 @@ export class PlayerController {
     private readonly playerService: PlayerService, // here
   ) {}
 
-  @Get()
-  async getPlayers(@Req() request: Request) {
-    let team_id: number;
-
-    // Get the players for the given team_id
-    const players = await this.playerService.findAllPlayersByTeam(team_id); // and here
-
+  @UseGuards(TeamGuard)
+  @Get('/:team_id')
+  async getPlayers(@Param('team_id') team_id: number) {
+    const players = await this.playerService.findAllPlayersByTeam(team_id);
     return players;
   }
 }

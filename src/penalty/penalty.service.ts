@@ -13,4 +13,8 @@ export class PenaltyService {
   findAllPenaltiesByTeam(teamId: number): Promise<Penalty[]> {
     return this.penaltiesRepository.find({ where: { team: { id: teamId } } });
   }
+
+  findPenaltyById(id: number): Promise<Penalty[]> {
+    return this.penaltiesRepository.find({ where: { id } });
+  }
 }
