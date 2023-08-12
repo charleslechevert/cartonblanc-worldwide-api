@@ -7,6 +7,7 @@ export class Team {
   id: number;
 
   @Column({ unique: true })
+  @Column()
   full_name: string;
 
   @Column()

@@ -26,7 +26,8 @@ export class PlayerController {
     private readonly playerService: PlayerService, // here
   ) {}
 
-  @UseGuards(TeamGuard)
+  //@UseGuards(TeamGuard)
+  @Public()
   @Get('/:team_id')
   async getPlayers(@Param('team_id') team_id: number) {
     const players = await this.playerService.findAllPlayersByTeam(team_id);

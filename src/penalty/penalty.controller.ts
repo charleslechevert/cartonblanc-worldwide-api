@@ -11,12 +11,13 @@ import {
   Delete,
   Res,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { PenaltyService } from './penalty.service';
 import { Penalty } from './penalty.entity';
 import * as bcrypt from 'bcrypt';
 import { userInfo } from 'os';
-import { Response, Request } from 'express';
+import { Response } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
 import { GetCurrentUserId } from 'src/decorators';
 import { CreatePenaltyDto } from 'src/dto';
@@ -31,8 +32,11 @@ export class PenaltyController {
 
   //@UseGuards(TeamGuard)
   @Get('/:team_id')
-  async getPenalties(@Param('team_id') team_id: number) {
-    const penalties = await this.penaltyService.findAllPenaltiesByTeam(team_id);
+  async getPenalties(@Req() req: Request, @Param('team_id') team_id: number) {
+    const penalties = await this.penaltyService.findAllPenaltiesByTeam(
+      req,
+      team_id,
+    );
     return penalties;
   }
 

@@ -1,4 +1,3 @@
-import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,6 +14,14 @@ import { RegisterModule } from './register/register.module';
 import { Register } from './register/register.entity';
 import { APP_GUARD } from '@nestjs/core';
 import { AtGuard } from './guards';
+
+import {
+  Module,
+  MiddlewareConsumer,
+  RequestMethod,
+  NestModule,
+} from '@nestjs/common';
+import { DemoDataMiddleware } from './middlewares/demo-data';
 
 @Module({
   imports: [

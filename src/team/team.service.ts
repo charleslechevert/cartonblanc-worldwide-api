@@ -5,7 +5,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Team } from './team.entity';
 import * as bcrypt from 'bcrypt';
-import { BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Tokens, JwtPayload } from 'src/types';
 import { AuthDto } from 'src/dto';
@@ -62,9 +61,12 @@ export class TeamService {
   }
 
   async signin(dto: AuthDto): Promise<Tokens> {
+    // Fetch all teams from the database
     const team = await this.teamRepository.findOne({
       where: { full_name: dto.full_name },
     });
+
+    console.log(team);
 
     if (!team) throw new ForbiddenException('acces denied');
 

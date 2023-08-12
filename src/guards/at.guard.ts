@@ -16,13 +16,6 @@ export class AtGuard extends AuthGuard('jwt') {
       context.getClass(),
     ]);
 
-    // Special handling for the demo team ID
-    const request = context.switchToHttp().getRequest();
-    const team_id = Number(request.params.team_id);
-    if (team_id === 12071998) {
-      return true;
-    }
-
     if (isPublic) return true;
 
     // If super.canActivate returns an Observable, you may need to convert it to a Promise
