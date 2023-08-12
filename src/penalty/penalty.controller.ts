@@ -19,7 +19,7 @@ import * as bcrypt from 'bcrypt';
 import { userInfo } from 'os';
 import { Response } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
-import { GetCurrentUserId } from 'src/decorators';
+import { GetCurrentUserId, Public } from 'src/decorators';
 import { CreatePenaltyDto } from 'src/dto';
 
 import { TeamGuard } from 'src/guards';
@@ -31,6 +31,7 @@ export class PenaltyController {
   ) {}
 
   //@UseGuards(TeamGuard)
+  //@Public()
   @Get('/:team_id')
   async getPenalties(@Req() req: Request, @Param('team_id') team_id: number) {
     const penalties = await this.penaltyService.findAllPenaltiesByTeam(

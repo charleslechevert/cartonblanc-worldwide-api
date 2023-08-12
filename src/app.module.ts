@@ -21,7 +21,6 @@ import {
   RequestMethod,
   NestModule,
 } from '@nestjs/common';
-import { DemoDataMiddleware } from './middlewares/demo-data';
 
 @Module({
   imports: [
