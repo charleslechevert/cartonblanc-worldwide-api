@@ -9,12 +9,13 @@ import { JwtService } from '@nestjs/jwt';
 import { Tokens, JwtPayload } from 'src/types';
 import { AuthDto } from 'src/dto';
 import { Storage } from '@google-cloud/storage';
+import { CustomFile } from 'src/types/google-upload.type';
 
 const storage = new Storage({
   projectId: ' modified-glyph-397210',
-  keyFilename: 'path_to_your_service_account_key.json',
+  keyFilename: './src/assets/cgp.json',
 });
-const bucket = storage.bucket('YOUR_BUCKET_NAME');
+const bucket = storage.bucket('cbww');
 
 @Injectable()
 export class TeamService {
@@ -127,5 +128,35 @@ export class TeamService {
 
   async findTeam(teamId: number): Promise<Team> {
     return this.teamRepository.findOne({ where: { id: teamId } });
+  }
+
+  async uploadFileToGCP(file: CustomFile, teamId: string): Promise<string> {
+    const filename = `${teamId}-${Date.now()}-${file.originalname}`;
+    const fileUpload = bucket.file(filename);
+
+    const stream = fileUpload.createWriteStream({
+      metadata: {
+        contentType: file.mimetype,
+      },
+    });
+
+    stream.on('error', (err) => {
+      file.cloudStorageError = err;
+      throw new Error(err.message);
+    });
+
+    stream.on('finish', () => {
+      file.cloudStorageObject = filename;
+      fileUpload.makePublic().then(() => {
+        file.cloudStoragePublicUrl = this.getPublicUrl(filename);
+      });
+    });
+
+    stream.end(file.buffer);
+    return this.getPublicUrl(filename);
+  }
+
+  getPublicUrl(filename: string): string {
+    return `https://storage.googleapis.com/${bucket.name}/${filename}`;
   }
 }

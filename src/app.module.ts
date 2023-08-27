@@ -14,6 +14,7 @@ import { RegisterModule } from './register/register.module';
 import { Register } from './register/register.entity';
 import { APP_GUARD } from '@nestjs/core';
 import { AtGuard } from './guards';
+import { MulterModule } from '@nestjs/platform-express';
 
 import {
   Module,
@@ -39,6 +40,9 @@ import {
     PlayerModule,
     PenaltyModule,
     RegisterModule,
+    MulterModule.register({
+      dest: './uploads',
+    }),
   ],
   controllers: [AppController, RegisterController],
   providers: [
