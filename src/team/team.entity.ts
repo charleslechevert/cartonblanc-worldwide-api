@@ -45,5 +45,8 @@ export class Team {
   color2: string;
 
   @Column({ nullable: true })
+  logo: string;
+
+  @Column({ nullable: true })
   refresh_token: string;
 }

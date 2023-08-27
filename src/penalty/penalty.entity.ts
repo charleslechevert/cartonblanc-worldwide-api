@@ -19,7 +19,7 @@ export class Penalty {
   name: string;
 
   @Column()
-  price: string;
+  price: number;
 
   @ManyToOne(() => Team, { onDelete: 'NO ACTION', onUpdate: 'NO ACTION' }) // You can add the onUpdate and onDelete options here
   @JoinColumn({ name: 'team_id' }) // This is the column name in the database.

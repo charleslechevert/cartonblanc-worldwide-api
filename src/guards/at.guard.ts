@@ -24,33 +24,55 @@ export class AtGuard extends AuthGuard('jwt') {
 
     if (isPublic) return true;
 
-    let canActivate: any;
-    let demoMode = false;
+    const request = context.switchToHttp().getRequest();
 
+    let isJwtError = false;
     try {
-      canActivate = await super.canActivate(context);
+      await super.canActivate(context);
     } catch (error) {
-      console.warn('JWT Error:', error.message); // Logging the error for traceability
-      demoMode = true;
-      canActivate = true; // Set canActivate to true so the guard doesn't block the request
+      console.warn('JWT Error:', error.message);
+      isJwtError = true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    if (demoMode) {
-      // In case of demo mode, override the teamId
+    if (isJwtError || this.isDemoMode(request)) {
+      // Block modifying methods for demo mode
+      if (this.isModifyingMethod(request)) {
+        throw new UnauthorizedException('Modifying demo data is not allowed');
+      }
+
+      // Block logout route for demo mode
+      if (this.isLogoutRoute(request)) {
+        throw new UnauthorizedException('Cannot logout the demo team');
+      }
+
+      // Override to demo mode if JWT error or demo team ID
       request.user = { sub: DEMO_TEAM_ID };
       request.params.team_id = DEMO_TEAM_ID;
     } else {
+      // Additional checks or operations for authenticated users can go here
       const teamIdInRoute = request.params.team_id;
       const teamIdInToken = request.user?.sub;
 
       if (teamIdInRoute != teamIdInToken) {
-        throw new UnauthorizedException(
-          'Team ID mismatch between token and route',
-        );
+        //!\\ Types between two values are different
+        request.user = { sub: DEMO_TEAM_ID };
+        request.params.team_id = DEMO_TEAM_ID;
       }
     }
 
-    return canActivate;
+    return true; // If none of the conditions block the request, allow it
+  }
+
+  private isModifyingMethod(request): boolean {
+    const disallowedMethods = ['POST', 'PUT', 'DELETE'];
+    return disallowedMethods.includes(request.method);
+  }
+
+  private isDemoMode(request): boolean {
+    return request.params.team_id === DEMO_TEAM_ID;
+  }
+
+  private isLogoutRoute(request): boolean {
+    return request.route.path.includes('/team/logout/');
   }
 }

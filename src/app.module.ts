@@ -32,7 +32,7 @@ import {
       password: 'cbww', // your db password
       database: 'cbww', // your db name
       entities: [Team, Player, Penalty, Register],
-      synchronize: true,
+      synchronize: false,
     }),
     TypeOrmModule.forFeature([Team, Player, Penalty, Register]),
     TeamModule,

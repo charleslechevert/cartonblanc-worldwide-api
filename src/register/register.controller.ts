@@ -26,8 +26,7 @@ export class RegisterController {
 
   @Get('/:team_id')
   async getRegisters(@Param('team_id') team_id: number) {
-    console.log('passé ou quoi?');
-    // Get the registers for the given team_id
+    // Get the registers for the given team_ids
     const registers = await this.registerService.findAllRegistersByTeam(
       team_id,
     );

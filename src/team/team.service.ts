@@ -8,6 +8,13 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { Tokens, JwtPayload } from 'src/types';
 import { AuthDto } from 'src/dto';
+import { Storage } from '@google-cloud/storage';
+
+const storage = new Storage({
+  projectId: ' modified-glyph-397210',
+  keyFilename: 'path_to_your_service_account_key.json',
+});
+const bucket = storage.bucket('YOUR_BUCKET_NAME');
 
 @Injectable()
 export class TeamService {
@@ -21,9 +28,10 @@ export class TeamService {
     return bcrypt.hash(data, 10);
   }
 
-  async getTokens(teamId: number): Promise<Tokens> {
+  async getTokens(teamId: number, isAdmin: boolean): Promise<Tokens> {
     const jwtPayload: JwtPayload = {
       sub: teamId,
+      isAdmin: isAdmin,
     };
 
     const [at, rt] = await Promise.all([
@@ -40,7 +48,23 @@ export class TeamService {
     return {
       access_token: at,
       refresh_token: rt,
+      isAdmin: isAdmin,
     };
+  }
+
+  async verifyPassword(
+    inputPassword: string,
+    regularPassword: string,
+    adminPassword: string,
+  ): Promise<boolean> {
+    const matchesRegular = await bcrypt.compare(inputPassword, regularPassword);
+    const matchesAdmin = await bcrypt.compare(inputPassword, adminPassword);
+
+    if (!matchesRegular && !matchesAdmin) {
+      throw new ForbiddenException('Access Denied!');
+    }
+
+    return matchesAdmin; // Returns true if it's an admin password, false otherwise
   }
 
   async updateRtHash(teamId: number, rt: string) {
@@ -55,25 +79,26 @@ export class TeamService {
     const newTeam = await this.teamRepository.create(data);
     await this.teamRepository.save(newTeam);
 
-    const tokens = await this.getTokens(newTeam.id);
+    const tokens = await this.getTokens(newTeam.id, true);
     await this.updateRtHash(newTeam.id, tokens.refresh_token);
     return tokens;
   }
 
   async signin(dto: AuthDto): Promise<Tokens> {
-    // Fetch all teams from the database
+    // Fetch the team with the given email or email_admin
     const team = await this.teamRepository.findOne({
-      where: { full_name: dto.full_name },
+      where: [{ email_team: dto.email }, { email_admin: dto.email }],
     });
 
-    console.log(team);
+    if (!team) throw new ForbiddenException('Access Denied!');
 
-    if (!team) throw new ForbiddenException('acces denied');
+    const isAdmin = await this.verifyPassword(
+      dto.password,
+      team.password,
+      team.admin_password,
+    );
 
-    const passwordMatches = await bcrypt.compare(dto.password, team.password);
-    if (!passwordMatches) throw new ForbiddenException('Access Denied!');
-
-    const tokens = await this.getTokens(team.id);
+    const tokens = await this.getTokens(team.id, isAdmin);
     await this.updateRtHash(team.id, tokens.refresh_token);
     return tokens;
   }
@@ -82,17 +107,25 @@ export class TeamService {
     await this.teamRepository.update(teamId, { refresh_token: null });
   }
 
-  async refreshTokens(teamId: number, rt: string) {
-    const team = await this.teamRepository.findOne({ where: { id: teamId } });
+  // async refreshTokens(teamId: number, rt: string) {
+  //   const team = await this.teamRepository.findOne({ where: { id: teamId } });
 
-    if (!team) throw new ForbiddenException('Acces Denied');
+  //   if (!team) throw new ForbiddenException('Acces Denied');
 
-    const rtMatches = bcrypt.compare(rt, team.refresh_token);
+  //   const rtMatches = bcrypt.compare(rt, team.refresh_token);
 
-    if (!rtMatches) throw new ForbiddenException('Acces Denied');
+  //   if (!rtMatches) throw new ForbiddenException('Acces Denied');
 
-    const tokens = await this.getTokens(team.id);
-    await this.updateRtHash(team.id, tokens.refresh_token);
-    return tokens;
+  //   const decoded = this.jwtService.decode(rt);
+  //   console.log(decoded)
+  //   const isAdmin = decoded.isAdmin;
+
+  //   const tokens = await this.getTokens(team.id);
+  //   await this.updateRtHash(team.id, tokens.refresh_token);
+  //   return tokens;
+  // }
+
+  async findTeam(teamId: number): Promise<Team> {
+    return this.teamRepository.findOne({ where: { id: teamId } });
   }
 }

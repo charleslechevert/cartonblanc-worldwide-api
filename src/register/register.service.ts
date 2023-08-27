@@ -16,6 +16,7 @@ export class RegisterService {
       .innerJoinAndSelect('register.player', 'player')
       .innerJoinAndSelect('register.penalty', 'penalty') // Add this line
       .where('player.team.id = :teamId', { teamId })
+      .orderBy('register.date', 'DESC')
       .getMany();
   }
 }

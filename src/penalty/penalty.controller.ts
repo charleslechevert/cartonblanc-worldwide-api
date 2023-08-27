@@ -47,7 +47,6 @@ export class PenaltyController {
     @Body() createPenaltyDto: any,
     @GetCurrentUserId() team_id: number,
   ) {
-    console.log('ok');
     //const penalty = await this.penaltyService.createPenalty(createPenaltyDto);
 
     return [];
