@@ -6,10 +6,14 @@ import { Repository } from 'typeorm';
 import { Team } from './team.entity';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { Tokens, JwtPayload } from 'src/types';
+import { Tokens, JwtPayload, SignupResponse } from 'src/types';
 import { AuthDto } from 'src/dto';
 import { Storage } from '@google-cloud/storage';
 import { CustomFile } from 'src/types/google-upload.type';
+import * as nodemailer from 'nodemailer';
+import * as speakeasy from 'speakeasy';
+import { randomBytes } from 'crypto';
+import { sendEmail } from 'src/utils/email/sendEmail';
 
 const storage = new Storage({
   projectId: ' modified-glyph-397210',
@@ -73,7 +77,7 @@ export class TeamService {
     await this.teamRepository.update(teamId, { refresh_token: hash });
   }
 
-  async signup(data: Partial<Team>): Promise<Tokens> {
+  async signup(data: Partial<Team>): Promise<SignupResponse> {
     data.password = await this.hashData(data.password);
     data.admin_password = await this.hashData(data.admin_password);
 
@@ -82,7 +86,11 @@ export class TeamService {
 
     const tokens = await this.getTokens(newTeam.id, true);
     await this.updateRtHash(newTeam.id, tokens.refresh_token);
-    return tokens;
+    return { ...tokens, team_id: newTeam.id };
+  }
+
+  async updateLogo(team_id: number, logoUrl: string): Promise<void> {
+    await this.teamRepository.update(team_id, { logo: logoUrl });
   }
 
   async signin(dto: AuthDto): Promise<Tokens> {
@@ -126,37 +134,176 @@ export class TeamService {
   //   return tokens;
   // }
 
-  async findTeam(teamId: number): Promise<Team> {
-    return this.teamRepository.findOne({ where: { id: teamId } });
+  async getSignedUrlForTeamLogo(logoUrl: string): Promise<string> {
+    const parts = logoUrl.split('/');
+    const filename = parts[parts.length - 1];
+
+    const fileReference = bucket.file(filename);
+
+    const options = {
+      version: 'v4' as const,
+      action: 'read' as const,
+      expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+
+    try {
+      const signedUrls = await fileReference.getSignedUrl(options);
+      return signedUrls[0];
+    } catch (error) {
+      throw new Error(`Failed to get signed URL. ${error.message}`);
+    }
   }
 
-  async uploadFileToGCP(file: CustomFile, teamId: string): Promise<string> {
-    const filename = `${teamId}-${Date.now()}-${file.originalname}`;
+  async findTeam(teamId: number): Promise<Team> {
+    const team = await this.teamRepository.findOne({ where: { id: teamId } });
+
+    if (team && team.logo && team.logo.startsWith('https://storage.')) {
+      // Extract the file name from the URL
+      const file = team.logo.split('/').pop();
+      // Convert it to a signed URL
+      team.logo = await this.getSignedUrlForTeamLogo(file);
+    }
+
+    return team;
+  }
+
+  // async uploadFileToGCP(file: CustomFile, team_id: number): Promise<string> {
+  //   const filename = `logo-team-${team_id}`;
+  //   const fileUpload = bucket.file(filename);
+
+  //   const stream = fileUpload.createWriteStream({
+  //     metadata: {
+  //       contentType: file.mimetype,
+  //     },
+  //   });
+
+  //   stream.on('error', (err) => {
+  //     file.cloudStorageError = err;
+  //     throw new Error(err.message);
+  //   });
+
+  //   stream.on('finish', () => {
+  //     file.cloudStorageObject = filename;
+  //     fileUpload.makePublic().then(() => {
+  //       file.cloudStoragePublicUrl = this.getPublicUrl(filename);
+  //     });
+  //   });
+
+  //   stream.end(file.buffer);
+  //   return this.getPublicUrl(filename);
+  // }
+
+  async uploadFileToGCP(file: CustomFile, team_id: number): Promise<string> {
+    const filename = `logo-team-${team_id}`;
     const fileUpload = bucket.file(filename);
 
-    const stream = fileUpload.createWriteStream({
-      metadata: {
-        contentType: file.mimetype,
-      },
-    });
-
-    stream.on('error', (err) => {
-      file.cloudStorageError = err;
-      throw new Error(err.message);
-    });
-
-    stream.on('finish', () => {
-      file.cloudStorageObject = filename;
-      fileUpload.makePublic().then(() => {
-        file.cloudStoragePublicUrl = this.getPublicUrl(filename);
+    const streamFinished = new Promise<void>((resolve, reject) => {
+      const stream = fileUpload.createWriteStream({
+        metadata: {
+          contentType: file.mimetype,
+        },
       });
+
+      stream.on('error', (err) => {
+        reject(err);
+      });
+
+      stream.on('finish', () => {
+        resolve();
+      });
+
+      stream.end(file.buffer);
     });
 
-    stream.end(file.buffer);
+    await streamFinished;
     return this.getPublicUrl(filename);
   }
 
   getPublicUrl(filename: string): string {
     return `https://storage.googleapis.com/${bucket.name}/${filename}`;
+  }
+
+  generateOtp(secreteKey: string) {
+    return speakeasy.totp({
+      secret: secreteKey,
+      step: 600,
+      digits: 4,
+      encoding: 'base32',
+    });
+  }
+
+  verifyOtp(secret: string, otp: string) {
+    return speakeasy.totp.verify({
+      secret,
+      token: otp,
+      step: 600,
+      digits: 4,
+      encoding: 'base32',
+    });
+  }
+
+  requestPasswordReset = async (email: string) => {
+    console.log(email);
+    const team = await this.teamRepository.findOne({
+      where: [{ email_team: email }, { email_admin: email }],
+    });
+
+    console.log(team);
+
+    if (!team) throw new Error('Team does not exist');
+
+    const resetToken = randomBytes(32).toString('hex');
+    const hash = await bcrypt.hash(resetToken, 12);
+    team.reset_password_token = hash;
+    const currentDate = new Date();
+    currentDate.setMinutes(currentDate.getMinutes() + 15);
+    team.reset_password_token_date = currentDate;
+
+    await this.teamRepository.save(team);
+
+    const link = `http;//localhost:3001/passwordReset?token=${resetToken}&id=${team.id}`;
+
+    sendEmail(
+      team.email_team,
+      'Demande de réinitialisation du mot de passe',
+      { name: team.full_name, link: link },
+      '../template/requestResetPassword.handlebars',
+    );
+    return link;
+  };
+
+  async resetPassword(userId: number, token: string, password: string) {
+    const team = await this.teamRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!team) {
+      throw new Error('User not found');
+    }
+
+    const currentDate = new Date();
+
+    // Check if the token has expired
+    if (
+      !team.reset_admin_password_token_date ||
+      currentDate > team.reset_admin_password_token_date
+    ) {
+      throw new Error('Invalid or expired password reset token');
+    }
+
+    const isValid = await bcrypt.compare(
+      token,
+      team.reset_admin_password_token,
+    );
+
+    if (!isValid) {
+      throw new Error('Invalid or expired password reset token');
+    }
+
+    const hash = await bcrypt.hash(password, 12);
+    team.password = hash;
+    team.reset_password_token = null;
+    team.reset_admin_password_token_date = null; // clear the expiration date
+    await this.teamRepository.save(team);
   }
 }

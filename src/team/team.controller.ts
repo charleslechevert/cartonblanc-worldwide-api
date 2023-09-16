@@ -20,7 +20,7 @@ import { userInfo } from 'os';
 import { Response, Request } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
 import { Tokens } from 'src/types';
-import { AuthDto } from '../dto';
+import { AuthDto, RequestNewPwdDto } from '../dto';
 import { Http2ServerRequest } from 'http2';
 
 import { AuthGuard } from '@nestjs/passport';
@@ -44,6 +44,26 @@ export class TeamController {
   //  return this.teamService.signup(teamData);
   // }
 
+  // @Public()
+  // @Post('signup')
+  // @UseInterceptors(FileInterceptor('logo'))
+  // @HttpCode(HttpStatus.CREATED)
+  // async signup(
+  //   @UploadedFile() logo: CustomFile,
+  //   @Body() teamData: Partial<Team>,
+  // ): Promise<Tokens> {
+  //   // Store the logo using your upload service
+  //   const logoUrl = await this.teamService.uploadFileToGCP(
+  //     logo,
+  //     teamData.full_name,
+  //   );
+
+  //   // Add the logo URL to the team data (or handle as you see fit)
+  //   teamData.logo = logoUrl;
+
+  //   return this.teamService.signup(teamData);
+  // }
+
   @Public()
   @Post('signup')
   @UseInterceptors(FileInterceptor('logo'))
@@ -52,16 +72,25 @@ export class TeamController {
     @UploadedFile() logo: CustomFile,
     @Body() teamData: Partial<Team>,
   ): Promise<Tokens> {
-    // Store the logo using your upload service
-    const logoUrl = await this.teamService.uploadFileToGCP(
-      logo,
-      teamData.full_name,
+    // Destructure the logo property from teamData so it doesn't get passed to the signup
+    const { logo: _, ...dataWithoutLogo } = teamData;
+
+    // First, insert the data without the logo and retrieve the team_id.
+    const { team_id, ...newTeamData } = await this.teamService.signup(
+      dataWithoutLogo,
     );
 
-    // Add the logo URL to the team data (or handle as you see fit)
-    teamData.logo = logoUrl;
+    if (logo) {
+      // Then, store the logo using your upload service
+      const logoUrl = await this.teamService.uploadFileToGCP(logo, team_id);
 
-    return this.teamService.signup(teamData);
+      // Update the team's record with the logo URL
+      await this.teamService.updateLogo(team_id, logoUrl);
+
+      console.log(newTeamData);
+    }
+
+    return newTeamData;
   }
 
   @Public()
@@ -96,12 +125,15 @@ export class TeamController {
     return players;
   }
 
-  // @Post('upload/:team_id')
-  // @UseInterceptors(FileInterceptor('file'))
-  // async uploadFile(
-  //   @UploadedFile() file: CustomFile,
-  //   @Param('team_id') team_id: number,
-  // ): Promise<string> {
-  //   return this.teamService.uploadFileToGCP(file, team_id);
-  // }
+  @Public()
+  @Post('/reset-password-request')
+  async resetPasswordRequestController(@Body() dto: RequestNewPwdDto) {
+    await this.teamService.requestPasswordReset(dto.email);
+  }
+
+  @Public()
+  @Post('/reset-password')
+  async resetPasswordController(@Body() user_id, token, password) {
+    await this.teamService.resetPassword(user_id, token, password);
+  }
 }

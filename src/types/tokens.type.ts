@@ -3,3 +3,7 @@ export type Tokens = {
   refresh_token: string;
   isAdmin: boolean;
 };
+
+export type SignupResponse = Tokens & {
+  team_id: number;
+};

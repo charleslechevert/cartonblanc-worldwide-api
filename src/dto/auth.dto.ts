@@ -9,3 +9,9 @@ export class AuthDto {
   @IsString()
   password: string;
 }
+
+export class RequestNewPwdDto {
+  @IsNotEmpty()
+  @IsString()
+  email: string;
+}

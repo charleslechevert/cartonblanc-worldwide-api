@@ -48,5 +48,20 @@ export class Team {
   logo: string;
 
   @Column({ nullable: true })
+  lydia_url: string;
+
+  @Column({ nullable: true })
   refresh_token: string;
+
+  @Column({ nullable: true })
+  reset_password_token: string;
+
+  @Column({ nullable: true })
+  reset_password_token_date: Date;
+
+  @Column({ nullable: true })
+  reset_admin_password_token: string;
+
+  @Column({ nullable: true })
+  reset_admin_password_token_date: Date;
 }
