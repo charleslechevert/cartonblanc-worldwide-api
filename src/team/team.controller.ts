@@ -32,6 +32,7 @@ import { Public } from 'src/decorators/public.decorator';
 import { UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomFile } from 'src/types/google-upload.type';
+import { ResetPasswordDto } from '../dto';
 
 @Controller('team')
 export class TeamController {
@@ -120,7 +121,7 @@ export class TeamController {
 
   @Get('/:team_id')
   async getPlayers(@Param('team_id') team_id: number) {
-    console.log(team_id);
+    console.log('really?', team_id);
     const players = await this.teamService.findTeam(team_id);
     return players;
   }
@@ -133,7 +134,7 @@ export class TeamController {
 
   @Public()
   @Post('/reset-password')
-  async resetPasswordController(@Body() user_id, token, password) {
-    await this.teamService.resetPassword(user_id, token, password);
+  async resetPasswordController(@Body() dto: ResetPasswordDto) {
+    await this.teamService.resetPassword(dto);
   }
 }

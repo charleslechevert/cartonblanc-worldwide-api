@@ -35,8 +35,12 @@ export class AtGuard extends AuthGuard('jwt') {
     }
 
     if (isJwtError || this.isDemoMode(request)) {
+      console.log(isJwtError);
+      console.log(request.params);
+      console.log(this.isDemoMode[request]);
       // Block modifying methods for demo mode
       if (this.isModifyingMethod(request)) {
+        console.log('passed here ?');
         throw new UnauthorizedException('Modifying demo data is not allowed');
       }
 

@@ -6,6 +6,7 @@ import {
   Post,
   Body,
   BadRequestException,
+  Put,
   Req,
   Param,
   Delete,
@@ -20,7 +21,7 @@ import { userInfo } from 'os';
 import { Response } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
 import { GetCurrentUserId, Public } from 'src/decorators';
-import { CreatePenaltyDto } from 'src/dto';
+import { CreatePenaltyDto, UpdatePenaltyDto } from 'src/dto';
 
 import { TeamGuard } from 'src/guards';
 
@@ -41,14 +42,26 @@ export class PenaltyController {
     return penalties;
   }
 
-  //@UseGuards(TeamGuard)
-  @Post()
-  async insertPenalty(
-    @Body() createPenaltyDto: any,
-    @GetCurrentUserId() team_id: number,
-  ) {
-    //const penalty = await this.penaltyService.createPenalty(createPenaltyDto);
+  @Post('/:team_id')
+  async insertPenalty(@Body() createPenaltyDto: CreatePenaltyDto) {
+    console.log('penalty', createPenaltyDto);
+    return this.penaltyService.insertPenalty(createPenaltyDto);
+  }
 
-    return [];
+  @Put('/:teamId')
+  async updatePenalty(
+    @Param('teamId') teamId: number,
+    @Body() updatePenaltyDto: UpdatePenaltyDto,
+  ): Promise<Penalty> {
+    console.log(updatePenaltyDto);
+    return await this.penaltyService.updatePenalty(updatePenaltyDto);
+  }
+
+  @Delete('/:penalty_id/team/:team_id')
+  async deletePenalty(
+    @Param('team_id') team_id: number,
+    @Param('penalty_id') penalty_id: number,
+  ): Promise<void> {
+    return await this.penaltyService.deletePenalty(penalty_id);
   }
 }

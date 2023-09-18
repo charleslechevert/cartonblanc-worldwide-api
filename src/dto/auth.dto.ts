@@ -15,3 +15,17 @@ export class RequestNewPwdDto {
   @IsString()
   email: string;
 }
+
+export class ResetPasswordDto {
+  @IsNotEmpty()
+  @IsString()
+  team_id: number;
+
+  @IsNotEmpty()
+  @IsString()
+  token: string;
+
+  @IsNotEmpty()
+  @IsString()
+  password: string;
+}

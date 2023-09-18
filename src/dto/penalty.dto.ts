@@ -8,5 +8,11 @@ export class CreatePenaltyDto {
   name: string;
 
   @IsNumber()
-  amount: number;
+  price: number;
+}
+
+export class UpdatePenaltyDto {
+  readonly name: string;
+  readonly price: number;
+  readonly id: number;
 }

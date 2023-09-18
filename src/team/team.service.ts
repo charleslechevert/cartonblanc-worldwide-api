@@ -14,6 +14,7 @@ import * as nodemailer from 'nodemailer';
 import * as speakeasy from 'speakeasy';
 import { randomBytes } from 'crypto';
 import { sendEmail } from 'src/utils/email/sendEmail';
+import { ResetPasswordDto } from 'src/dto';
 
 const storage = new Storage({
   projectId: ' modified-glyph-397210',
@@ -272,9 +273,11 @@ export class TeamService {
     return link;
   };
 
-  async resetPassword(userId: number, token: string, password: string) {
+  async resetPassword(dto: ResetPasswordDto) {
+    const { team_id, token, password } = dto;
+
     const team = await this.teamRepository.findOne({
-      where: { id: userId },
+      where: { id: team_id },
     });
 
     if (!team) {
@@ -283,27 +286,54 @@ export class TeamService {
 
     const currentDate = new Date();
 
-    // Check if the token has expired
-    if (
-      !team.reset_admin_password_token_date ||
-      currentDate > team.reset_admin_password_token_date
-    ) {
-      throw new Error('Invalid or expired password reset token');
+    let tokenMatched = false;
+    let passwordToReset = null;
+    let tokenDate = null;
+
+    // Check user password reset token
+    const isValidUserToken = await bcrypt.compare(
+      token,
+      team.reset_password_token,
+    );
+
+    if (isValidUserToken && currentDate <= team.reset_password_token_date) {
+      tokenMatched = true;
+      passwordToReset = 'password';
+      tokenDate = 'reset_password_token_date';
     }
 
-    const isValid = await bcrypt.compare(
+    // Check admin password reset token
+    const isValidAdminToken = await bcrypt.compare(
       token,
       team.reset_admin_password_token,
     );
 
-    if (!isValid) {
+    if (
+      isValidAdminToken &&
+      currentDate <= team.reset_admin_password_token_date
+    ) {
+      if (tokenMatched) {
+        throw new Error('Token ambiguity. Matches both user and admin.');
+      }
+      tokenMatched = true;
+      passwordToReset = 'admin_password';
+      tokenDate = 'reset_password_token_admin_date';
+    }
+
+    if (!tokenMatched) {
       throw new Error('Invalid or expired password reset token');
     }
 
     const hash = await bcrypt.hash(password, 12);
-    team.password = hash;
-    team.reset_password_token = null;
-    team.reset_admin_password_token_date = null; // clear the expiration date
+    team[passwordToReset] = hash; // Reset the appropriate password
+    team[tokenDate] = null; // Clear the expiration date
+
+    if (passwordToReset === 'password') {
+      team.reset_password_token = null;
+    } else if (passwordToReset === 'admin_password') {
+      team.reset_admin_password_token = null;
+    }
+
     await this.teamRepository.save(team);
   }
 }
