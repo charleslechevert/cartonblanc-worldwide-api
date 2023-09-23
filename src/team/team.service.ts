@@ -7,7 +7,7 @@ import { Team } from './team.entity';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { Tokens, JwtPayload, SignupResponse } from 'src/types';
-import { AuthDto } from 'src/dto';
+import { AuthDto, UpdateTeamDto } from 'src/dto';
 import { Storage } from '@google-cloud/storage';
 import { CustomFile } from 'src/types/google-upload.type';
 import * as nodemailer from 'nodemailer';
@@ -15,6 +15,8 @@ import * as speakeasy from 'speakeasy';
 import { randomBytes } from 'crypto';
 import { sendEmail } from 'src/utils/email/sendEmail';
 import { ResetPasswordDto } from 'src/dto';
+import { NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 
 const storage = new Storage({
   projectId: ' modified-glyph-397210',
@@ -79,6 +81,28 @@ export class TeamService {
   }
 
   async signup(data: Partial<Team>): Promise<SignupResponse> {
+    // Check if email_team already exists in either email_team or email_admin columns
+    const existingTeamEmail = await this.teamRepository.findOne({
+      where: [
+        { email_team: data.email_team },
+        { email_admin: data.email_team },
+      ],
+    });
+    if (existingTeamEmail) {
+      throw new ConflictException("L'email de l'équipe existe déjà");
+    }
+
+    // Check if email_admin already exists in either email_team or email_admin columns
+    const existingAdminEmail = await this.teamRepository.findOne({
+      where: [
+        { email_team: data.email_admin },
+        { email_admin: data.email_admin },
+      ],
+    });
+    if (existingAdminEmail) {
+      throw new ConflictException("L'email admin existe déjà");
+    }
+
     data.password = await this.hashData(data.password);
     data.admin_password = await this.hashData(data.admin_password);
 
@@ -117,24 +141,6 @@ export class TeamService {
     await this.teamRepository.update(teamId, { refresh_token: null });
   }
 
-  // async refreshTokens(teamId: number, rt: string) {
-  //   const team = await this.teamRepository.findOne({ where: { id: teamId } });
-
-  //   if (!team) throw new ForbiddenException('Acces Denied');
-
-  //   const rtMatches = bcrypt.compare(rt, team.refresh_token);
-
-  //   if (!rtMatches) throw new ForbiddenException('Acces Denied');
-
-  //   const decoded = this.jwtService.decode(rt);
-  //   console.log(decoded)
-  //   const isAdmin = decoded.isAdmin;
-
-  //   const tokens = await this.getTokens(team.id);
-  //   await this.updateRtHash(team.id, tokens.refresh_token);
-  //   return tokens;
-  // }
-
   async getSignedUrlForTeamLogo(logoUrl: string): Promise<string> {
     const parts = logoUrl.split('/');
     const filename = parts[parts.length - 1];
@@ -168,33 +174,8 @@ export class TeamService {
     return team;
   }
 
-  // async uploadFileToGCP(file: CustomFile, team_id: number): Promise<string> {
-  //   const filename = `logo-team-${team_id}`;
-  //   const fileUpload = bucket.file(filename);
-
-  //   const stream = fileUpload.createWriteStream({
-  //     metadata: {
-  //       contentType: file.mimetype,
-  //     },
-  //   });
-
-  //   stream.on('error', (err) => {
-  //     file.cloudStorageError = err;
-  //     throw new Error(err.message);
-  //   });
-
-  //   stream.on('finish', () => {
-  //     file.cloudStorageObject = filename;
-  //     fileUpload.makePublic().then(() => {
-  //       file.cloudStoragePublicUrl = this.getPublicUrl(filename);
-  //     });
-  //   });
-
-  //   stream.end(file.buffer);
-  //   return this.getPublicUrl(filename);
-  // }
-
   async uploadFileToGCP(file: CustomFile, team_id: number): Promise<string> {
+    console.log('passed right ?');
     const filename = `logo-team-${team_id}`;
     const fileUpload = bucket.file(filename);
 
@@ -221,6 +202,7 @@ export class TeamService {
   }
 
   getPublicUrl(filename: string): string {
+    console.log('get public url passed');
     return `https://storage.googleapis.com/${bucket.name}/${filename}`;
   }
 
@@ -335,5 +317,62 @@ export class TeamService {
     }
 
     await this.teamRepository.save(team);
+  }
+
+  async updateTeam(updateTeamInfoDto: UpdateTeamDto): Promise<Team> {
+    // First, retrieve the existing team using the provided ID.
+    const existingTeam = await this.teamRepository.findOne({
+      where: { id: updateTeamInfoDto.id },
+    });
+
+    // If the team doesn't exist, throw an error.
+    if (!existingTeam) {
+      throw new NotFoundException(
+        `Team with ID ${updateTeamInfoDto.id} not found.`,
+      );
+    }
+
+    // Update the team details based on the DTO
+    if (updateTeamInfoDto.objective !== undefined) {
+      existingTeam.objective = updateTeamInfoDto.objective;
+    }
+
+    if (updateTeamInfoDto.sentence !== undefined) {
+      existingTeam.sentence = updateTeamInfoDto.sentence;
+    }
+
+    if (updateTeamInfoDto.lydia_url !== undefined) {
+      existingTeam.lydia_url = updateTeamInfoDto.lydia_url;
+    }
+
+    if (updateTeamInfoDto.full_name !== undefined) {
+      existingTeam.full_name = updateTeamInfoDto.full_name;
+    }
+
+    if (updateTeamInfoDto.short_name !== undefined) {
+      existingTeam.short_name = updateTeamInfoDto.short_name;
+    }
+
+    if (updateTeamInfoDto.color1 !== undefined) {
+      existingTeam.color1 = updateTeamInfoDto.color1;
+    }
+
+    if (updateTeamInfoDto.color2 !== undefined) {
+      existingTeam.color2 = updateTeamInfoDto.color2;
+    }
+
+    // Save the updated team
+    const updatedTeam = await this.teamRepository.save(existingTeam);
+
+    // Check if the team logo is stored in GCS and convert it to a signed URL if necessary
+    if (updatedTeam.logo && updatedTeam.logo.startsWith('https://storage.')) {
+      // Extract the file name from the URL
+      const file = updatedTeam.logo.split('/').pop();
+      // Convert it to a signed URL
+      updatedTeam.logo = await this.getSignedUrlForTeamLogo(file);
+    }
+
+    // Return the updated team with the signed logo URL (if applicable)
+    return updatedTeam;
   }
 }

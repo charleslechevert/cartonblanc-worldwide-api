@@ -5,12 +5,15 @@ import { Penalty } from './penalty.entity';
 import { CreatePenaltyDto, UpdatePenaltyDto } from 'src/dto';
 import { ConflictException } from '@nestjs/common';
 import { NotFoundException } from '@nestjs/common';
+import { Register } from 'src/register/register.entity';
 
 @Injectable()
 export class PenaltyService {
   constructor(
     @InjectRepository(Penalty)
     private penaltiesRepository: Repository<Penalty>,
+    @InjectRepository(Register)
+    private registerRepository: Repository<Register>,
   ) {}
 
   // findAllPenaltiesByTeam(teamId: number): Promise<Penalty[]> {
@@ -85,6 +88,16 @@ export class PenaltyService {
   }
 
   async deletePenalty(penaltyId: number): Promise<void> {
+    const relatedRegisters = await this.registerRepository.count({
+      where: { penalty: { id: penaltyId } },
+    });
+
+    if (relatedRegisters > 0) {
+      throw new ConflictException(
+        'Cannot delete penalty because there are related registers.',
+      );
+    }
+
     const result = await this.penaltiesRepository.delete(penaltyId);
     if (result.affected === 0) {
       throw new NotFoundException(`Penalty with ID ${penaltyId} not found`);

@@ -4,12 +4,15 @@ import { Repository } from 'typeorm';
 import { Player } from './player.entity';
 import { CreatePlayerDto, UpdatePlayerDto } from 'src/dto/player.dto';
 import { NotFoundException, ConflictException } from '@nestjs/common';
+import { Register } from 'src/register/register.entity';
 
 @Injectable()
 export class PlayerService {
   constructor(
     @InjectRepository(Player)
     private playersRepository: Repository<Player>,
+    @InjectRepository(Register)
+    private registerRepository: Repository<Register>,
   ) {}
 
   findAllPlayersByTeam(teamId: number): Promise<Player[]> {
@@ -36,6 +39,16 @@ export class PlayerService {
   }
 
   async deletePlayer(playerId: number): Promise<void> {
+    const relatedRegisters = await this.registerRepository.count({
+      where: { player: { id: playerId } },
+    });
+
+    if (relatedRegisters > 0) {
+      throw new ConflictException(
+        'Cannot delete player because there are related registers.',
+      );
+    }
+
     const result = await this.playersRepository.delete(playerId);
     if (result.affected === 0) {
       throw new NotFoundException(`Player with ID ${playerId} not found`);

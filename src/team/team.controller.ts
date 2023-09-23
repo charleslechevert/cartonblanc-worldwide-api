@@ -8,6 +8,7 @@ import {
   BadRequestException,
   Req,
   Res,
+  Put,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -32,7 +33,7 @@ import { Public } from 'src/decorators/public.decorator';
 import { UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomFile } from 'src/types/google-upload.type';
-import { ResetPasswordDto } from '../dto';
+import { ResetPasswordDto, UpdateTeamDto } from '../dto';
 
 @Controller('team')
 export class TeamController {
@@ -82,6 +83,7 @@ export class TeamController {
     );
 
     if (logo) {
+      console.log('passed signed up!');
       // Then, store the logo using your upload service
       const logoUrl = await this.teamService.uploadFileToGCP(logo, team_id);
 
@@ -136,5 +138,25 @@ export class TeamController {
   @Post('/reset-password')
   async resetPasswordController(@Body() dto: ResetPasswordDto) {
     await this.teamService.resetPassword(dto);
+  }
+
+  @Put('/:teamId')
+  @UseInterceptors(FileInterceptor('logo'))
+  async updateTeamInfo(
+    @Param('teamId') teamId: number,
+    @UploadedFile() logo: CustomFile,
+    @Body() updateTeamDto: any,
+  ): Promise<Team> {
+    const { logo: _, ...dataWithoutLogo } = updateTeamDto;
+
+    const updatedTeam = await this.teamService.updateTeam(dataWithoutLogo);
+
+    // If a logo file is provided, handle it
+    if (logo) {
+      const logoUrl = await this.teamService.uploadFileToGCP(logo, teamId);
+      await this.teamService.updateLogo(teamId, logoUrl);
+    }
+
+    return updatedTeam;
   }
 }

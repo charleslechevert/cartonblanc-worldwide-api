@@ -9,6 +9,7 @@ import { Register } from './register.entity';
     TypeOrmModule.forFeature([Register]), // import TypeOrmModule for Register
   ],
   controllers: [RegisterController], // RegisterController instead of TeamController
-  providers: [RegisterService], // RegisterService instead of TeamService
+  providers: [RegisterService],
+  exports: [TypeOrmModule], // RegisterService instead of TeamService
 })
 export class RegisterModule {}

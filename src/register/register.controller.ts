@@ -8,6 +8,8 @@ import {
   BadRequestException,
   Req,
   Res,
+  Put,
+  Delete,
   Param,
 } from '@nestjs/common';
 import { RegisterService } from './register.service';
@@ -17,6 +19,7 @@ import { userInfo } from 'os';
 import { Response, Request } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
 import { Public } from 'src/decorators/public.decorator';
+import { CreateRegisterDto, UpdateRegisterDto } from 'src/dto';
 
 @Controller('register')
 export class RegisterController {
@@ -34,14 +37,27 @@ export class RegisterController {
     return registers;
   }
 
-  @Public()
-  @Get('demo')
-  async getRegistersDemo() {
-    // Get the registers for the given team_id
-    const registers = await this.registerService.findAllRegistersByTeam(
-      12071998,
-    ); // and here
+  @Post('/:team_id')
+  async insertRegister(@Body() createRegisterDto: any) {
+    console.log(createRegisterDto);
+    return this.registerService.insertRegister(createRegisterDto);
+  }
 
-    return registers;
+  @Put('/:teamId')
+  async updateRegister(
+    @Param('teamId') teamId: number,
+    @Body() updateRegisterDto: UpdateRegisterDto,
+  ): Promise<Register> {
+    console.log('controller hit??');
+    console.log(updateRegisterDto);
+    return await this.registerService.updateRegister(updateRegisterDto);
+  }
+
+  @Delete('/:register_id/team/:team_id')
+  async deletePlayer(
+    @Param('team_id') team_id: number,
+    @Param('register_id') register_id: number,
+  ): Promise<void> {
+    return await this.registerService.deleteRegister(register_id);
   }
 }
