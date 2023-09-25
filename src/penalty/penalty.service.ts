@@ -68,8 +68,6 @@ export class PenaltyService {
       },
     });
 
-    console.log(existingPenalty);
-
     // If the player doesn't exist, throw an error or handle accordingly.
     if (!existingPenalty) {
       throw new NotFoundException(

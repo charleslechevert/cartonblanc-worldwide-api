@@ -6,7 +6,6 @@ export class Team {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
   @Column()
   full_name: string;
 
@@ -29,12 +28,8 @@ export class Team {
   sentence: string;
 
   @IsEmail()
-  @Column()
+  @Column({ unique: true })
   email_team: string;
-
-  @IsEmail()
-  @Column()
-  email_admin: string;
 
   @IsHexColor()
   @Column()

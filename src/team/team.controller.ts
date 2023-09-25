@@ -74,26 +74,27 @@ export class TeamController {
     @UploadedFile() logo: CustomFile,
     @Body() teamData: Partial<Team>,
   ): Promise<Tokens> {
-    // Destructure the logo property from teamData so it doesn't get passed to the signup
-    const { logo: _, ...dataWithoutLogo } = teamData;
+    try {
+      // Destructure the logo property from teamData so it doesn't get passed to the signup
+      const { logo: _, ...dataWithoutLogo } = teamData;
 
-    // First, insert the data without the logo and retrieve the team_id.
-    const { team_id, ...newTeamData } = await this.teamService.signup(
-      dataWithoutLogo,
-    );
+      // First, insert the data without the logo and retrieve the team_id.
+      const { team_id, ...newTeamData } = await this.teamService.signup(
+        dataWithoutLogo,
+      );
 
-    if (logo) {
-      console.log('passed signed up!');
-      // Then, store the logo using your upload service
-      const logoUrl = await this.teamService.uploadFileToGCP(logo, team_id);
+      if (logo) {
+        // Then, store the logo using your upload service
+        const logoUrl = await this.teamService.uploadFileToGCP(logo, team_id);
 
-      // Update the team's record with the logo URL
-      await this.teamService.updateLogo(team_id, logoUrl);
+        // Update the team's record with the logo URL
+        await this.teamService.updateLogo(team_id, logoUrl);
+      }
 
-      console.log(newTeamData);
+      return newTeamData;
+    } catch (error) {
+      throw error;
     }
-
-    return newTeamData;
   }
 
   @Public()
@@ -131,7 +132,7 @@ export class TeamController {
   @Public()
   @Post('/reset-password-request')
   async resetPasswordRequestController(@Body() dto: RequestNewPwdDto) {
-    await this.teamService.requestPasswordReset(dto.email);
+    await this.teamService.requestPasswordReset(dto.email, dto.admin);
   }
 
   @Public()

@@ -83,25 +83,13 @@ export class TeamService {
   async signup(data: Partial<Team>): Promise<SignupResponse> {
     // Check if email_team already exists in either email_team or email_admin columns
     const existingTeamEmail = await this.teamRepository.findOne({
-      where: [
-        { email_team: data.email_team },
-        { email_admin: data.email_team },
-      ],
+      where: [{ email_team: data.email_team }],
     });
     if (existingTeamEmail) {
       throw new ConflictException("L'email de l'équipe existe déjà");
     }
 
     // Check if email_admin already exists in either email_team or email_admin columns
-    const existingAdminEmail = await this.teamRepository.findOne({
-      where: [
-        { email_team: data.email_admin },
-        { email_admin: data.email_admin },
-      ],
-    });
-    if (existingAdminEmail) {
-      throw new ConflictException("L'email admin existe déjà");
-    }
 
     data.password = await this.hashData(data.password);
     data.admin_password = await this.hashData(data.admin_password);
@@ -121,7 +109,7 @@ export class TeamService {
   async signin(dto: AuthDto): Promise<Tokens> {
     // Fetch the team with the given email or email_admin
     const team = await this.teamRepository.findOne({
-      where: [{ email_team: dto.email }, { email_admin: dto.email }],
+      where: [{ email_team: dto.email }],
     });
 
     if (!team) throw new ForbiddenException('Access Denied!');
@@ -175,7 +163,6 @@ export class TeamService {
   }
 
   async uploadFileToGCP(file: CustomFile, team_id: number): Promise<string> {
-    console.log('passed right ?');
     const filename = `logo-team-${team_id}`;
     const fileUpload = bucket.file(filename);
 
@@ -202,7 +189,6 @@ export class TeamService {
   }
 
   getPublicUrl(filename: string): string {
-    console.log('get public url passed');
     return `https://storage.googleapis.com/${bucket.name}/${filename}`;
   }
 
@@ -225,26 +211,32 @@ export class TeamService {
     });
   }
 
-  requestPasswordReset = async (email: string) => {
-    console.log(email);
+  requestPasswordReset = async (email: string, admin: boolean) => {
     const team = await this.teamRepository.findOne({
-      where: [{ email_team: email }, { email_admin: email }],
+      where: [{ email_team: email }],
     });
-
-    console.log(team);
 
     if (!team) throw new Error('Team does not exist');
 
     const resetToken = randomBytes(32).toString('hex');
     const hash = await bcrypt.hash(resetToken, 12);
-    team.reset_password_token = hash;
+
     const currentDate = new Date();
     currentDate.setMinutes(currentDate.getMinutes() + 15);
-    team.reset_password_token_date = currentDate;
+
+    // Modify token and token date based on the 'admin' parameter
+    if (admin) {
+      team.reset_admin_password_token = hash;
+      team.reset_admin_password_token_date = currentDate;
+    } else {
+      team.reset_password_token = hash;
+      team.reset_password_token_date = currentDate;
+    }
 
     await this.teamRepository.save(team);
 
-    const link = `http;//localhost:3001/passwordReset?token=${resetToken}&id=${team.id}`;
+    // Append 'admin' parameter to the link
+    const link = `${process.env.FRONTEND_URL}/passwordReset?token=${resetToken}&id=${team.id}&admin=${admin}`;
 
     sendEmail(
       team.email_team,
@@ -256,7 +248,7 @@ export class TeamService {
   };
 
   async resetPassword(dto: ResetPasswordDto) {
-    const { team_id, token, password } = dto;
+    const { team_id, token, password, admin } = dto;
 
     const team = await this.teamRepository.findOne({
       where: { id: team_id },
@@ -268,52 +260,61 @@ export class TeamService {
 
     const currentDate = new Date();
 
-    let tokenMatched = false;
-    let passwordToReset = null;
-    let tokenDate = null;
+    if (admin) {
+      // For admin password reset
+      const isValidAdminToken = await bcrypt.compare(
+        token,
+        team.reset_admin_password_token,
+      );
 
-    // Check user password reset token
-    const isValidUserToken = await bcrypt.compare(
-      token,
-      team.reset_password_token,
-    );
+      if (
+        isValidAdminToken &&
+        currentDate <= team.reset_admin_password_token_date
+      ) {
+        // Check if new admin password is the same as the team's current password
+        const isSameAsCurrentPassword = await bcrypt.compare(
+          password,
+          team.password,
+        );
+        if (isSameAsCurrentPassword) {
+          throw new Error(
+            "New admin password cannot be the same as the team's current password",
+          );
+        }
 
-    if (isValidUserToken && currentDate <= team.reset_password_token_date) {
-      tokenMatched = true;
-      passwordToReset = 'password';
-      tokenDate = 'reset_password_token_date';
-    }
-
-    // Check admin password reset token
-    const isValidAdminToken = await bcrypt.compare(
-      token,
-      team.reset_admin_password_token,
-    );
-
-    if (
-      isValidAdminToken &&
-      currentDate <= team.reset_admin_password_token_date
-    ) {
-      if (tokenMatched) {
-        throw new Error('Token ambiguity. Matches both user and admin.');
+        const hash = await bcrypt.hash(password, 12);
+        team.admin_password = hash; // Reset the admin password
+        team.reset_admin_password_token = null; // Clear the reset token for admin
+        team.reset_admin_password_token_date = null; // Clear the expiration date for admin
+      } else {
+        throw new Error('Invalid or expired admin password reset token');
       }
-      tokenMatched = true;
-      passwordToReset = 'admin_password';
-      tokenDate = 'reset_password_token_admin_date';
-    }
+    } else {
+      // For user password reset
+      const isValidUserToken = await bcrypt.compare(
+        token,
+        team.reset_password_token,
+      );
 
-    if (!tokenMatched) {
-      throw new Error('Invalid or expired password reset token');
-    }
+      if (isValidUserToken && currentDate <= team.reset_password_token_date) {
+        // Check if new user password is the same as the team's admin password
+        const isSameAsAdminPassword = await bcrypt.compare(
+          password,
+          team.admin_password,
+        );
+        if (isSameAsAdminPassword) {
+          throw new Error(
+            "New password cannot be the same as the team's admin password",
+          );
+        }
 
-    const hash = await bcrypt.hash(password, 12);
-    team[passwordToReset] = hash; // Reset the appropriate password
-    team[tokenDate] = null; // Clear the expiration date
-
-    if (passwordToReset === 'password') {
-      team.reset_password_token = null;
-    } else if (passwordToReset === 'admin_password') {
-      team.reset_admin_password_token = null;
+        const hash = await bcrypt.hash(password, 12);
+        team.password = hash; // Reset the user password
+        team.reset_password_token = null; // Clear the reset token for user
+        team.reset_password_token_date = null; // Clear the expiration date for user
+      } else {
+        throw new Error('Invalid or expired user password reset token');
+      }
     }
 
     await this.teamRepository.save(team);

@@ -10,13 +10,16 @@ export const sendEmail = async (
   payload,
   template,
 ): Promise<boolean> => {
+  console.log('Username:', process.env.EMAIL_USERNAME);
+  console.log('Password:', process.env.EMAIL_PASSWORD);
+
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       auth: {
-        user: 'charles.lechevert@gmail.com',
-        pass: 'eqwj qjzj dklv vjih',
+        user: process.env.EMAIL_USERNAME,
+        pass: process.env.EMAIL_PASSWORD,
       },
       secure: true,
     });
@@ -31,8 +34,8 @@ export const sendEmail = async (
 
     const options = () => {
       return {
-        from: 'charles.lechevert@gmail.com',
-        to: 'charles.lechevert@outlook.fr',
+        from: process.env.EMAIL_USERNAME,
+        to: email,
         subject: subject,
         html: htmlToSend,
       };

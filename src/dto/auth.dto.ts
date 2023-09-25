@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsBoolean } from 'class-validator';
 
 export class AuthDto {
   @IsNotEmpty()
@@ -14,6 +14,10 @@ export class RequestNewPwdDto {
   @IsNotEmpty()
   @IsString()
   email: string;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  admin: boolean;
 }
 
 export class ResetPasswordDto {
@@ -28,4 +32,8 @@ export class ResetPasswordDto {
   @IsNotEmpty()
   @IsString()
   password: string;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  admin: boolean;
 }
