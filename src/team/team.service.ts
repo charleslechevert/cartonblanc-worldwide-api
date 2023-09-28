@@ -20,7 +20,7 @@ import { ConflictException } from '@nestjs/common';
 
 const storage = new Storage({
   projectId: ' modified-glyph-397210',
-  keyFilename: './src/assets/cgp.json',
+  keyFilename: './src/cgp.json',
 });
 const bucket = storage.bucket('cbww');
 
