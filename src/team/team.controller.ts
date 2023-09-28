@@ -74,6 +74,8 @@ export class TeamController {
     @UploadedFile() logo: CustomFile,
     @Body() teamData: Partial<Team>,
   ): Promise<Tokens> {
+    console.log(logo);
+
     try {
       // Destructure the logo property from teamData so it doesn't get passed to the signup
       const { logo: _, ...dataWithoutLogo } = teamData;
